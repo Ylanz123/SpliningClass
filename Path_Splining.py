@@ -8,7 +8,7 @@ class Path_Splining():
         This class contains all the methods responsible for creating and modifying a custom
         spline between waypoints.
     """
-    def __init__(self, turn_radius=3.7, boundary_points=[], waypoints=[], resolution=3, tolerance=0):
+    def __init__(self, turn_radius=0.8, boundary_points=[], waypoints=[], resolution=3, tolerance=0):
         """
         Initialiser method
             This method can be used to initialise the class with or without the parameters
@@ -128,9 +128,6 @@ class Path_Splining():
         m = (yn - yo) / (xn - xo)
         y_intersection = m * (x_intersection - xo) + yo
 
-        print(x_intersection)
-        print(y_intersection)
-
         x_diff = xm - x_intersection
         y_diff = ym - y_intersection
 
@@ -152,32 +149,51 @@ class Path_Splining():
         :return:
         """
         r = self._turn_radius
-        P1 = [0, 0]
-        P2 = [0, 3]
-        P3 = [4, 0]
-        # Get P2 Vertex Angle
-        vertex_angle = self.vertex_angle(P1, P2, P3)
-        print(vertex_angle)
+        # Part 1: Find the centre-point of the circle the path will trace.
+        # Get inverse gradient of current waypoint to previous waypoint
+        previous_point = [3.8, 1]
+        current_point = [3, 3.5]
+        next_point = [6, 5]
+        inv_grad_numerator = current_point[0] - previous_point[0]
+        inv_grad_denominator = current_point[1] - previous_point[1]
+        # Get 2 possible points along that gradient from current waypoint that are of minimum turning r distance
+        gradient_angle = math.atan2(inv_grad_numerator, inv_grad_denominator)
+        print("Theta:", gradient_angle)
+        first_point = [current_point[0] - r * math.cos(gradient_angle), current_point[1] + r * math.sin(gradient_angle)]
+        second_point = [current_point[0] - r * math.cos(gradient_angle + math.pi), current_point[1] + r * math.sin(gradient_angle + math.pi)]
+        print("First point:", first_point)
+        print("Second point:", second_point)
+        # Pick the point that is closer to the next waypoint
+        first_point_dist = math.sqrt((first_point[0] - next_point[0]) ** 2 + (first_point[1] - next_point[1]) ** 2)
+        second_point_dist = math.sqrt((second_point[0] - next_point[0]) ** 2 + (second_point[1] - next_point[1]) ** 2)
+        print("First dist:", first_point_dist)
+        print("Second dist:", second_point_dist)
+        if first_point_dist <= second_point_dist:
+            centre_point = first_point
+        else:
+            centre_point = second_point
+        # Find the vertex angle
         # The vertex angle is how much angle of the circle the waypoint COULD lie on.
+        vertex_angle = self.vertex_angle(previous_point, current_point, next_point)
+        print("Vertex angle:", vertex_angle)
         # Maybe try to for loop over x degree intervals
 
-        origin_point = [4, 4]
-        destination_point = [3.8, 0]
-        theta = self.find_dual_perpendicular_angle(radius=r, origin=origin_point, point=destination_point, n=0)
-
+        print("Centre point:", centre_point)
+        theta = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_point, n=0)
+        print("Theta before constraint:", theta)
         # Constrain theta between -pi and pi
         if theta > math.pi or theta < -math.pi:
             theta = self.constrain_pi(theta)
 
-        print(theta)
+        print("Theta after constraint:", theta)
 
-        point_to_mirror = [origin_point[0] + r * math.cos(theta), origin_point[1] + r * math.sin(theta)]
-        print(point_to_mirror)
-        mirror_point = self.mirror_across_line(origin_point, destination_point, point_to_mirror)
-        print(mirror_point)
+        point_to_mirror = [centre_point[0] - r * math.cos(theta), centre_point[1] - r * math.sin(theta)]
+        print("Intersection point:", point_to_mirror)
+        mirror_point = self.mirror_across_line(centre_point, next_point, point_to_mirror)
+        print("Opposite intersection point:", mirror_point)
 
-        true_angle = math.atan2(mirror_point[1] - origin_point[1], mirror_point[0] - origin_point[0])
-        print(true_angle)
+        true_angle = math.atan2(mirror_point[1] - centre_point[1], mirror_point[0] - centre_point[0])
+        print("Opposite theta:", true_angle)
 
 
 if "__main__" == __name__:
