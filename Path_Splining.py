@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 import matplotlib.pyplot as plt
 import math
 
@@ -65,15 +65,18 @@ class Path_Splining():
         print("Current Waypoints:")
         print(self._waypoints)
 
-    def plot_waypoints(self):
+    def plot_waypoints(self, waypoints_to_plot):
         lat_vals = []
         lon_vals = []
         # Loop through to get each lat and lon value
-        for waypoint in self._waypoints:
+        for waypoint in waypoints_to_plot:
             lat_vals.append(waypoint[0])
             lon_vals.append(waypoint[1])
 
-        plt.plot(lat_vals, lon_vals)
+        plt.plot(lat_vals, lon_vals, '--bo')
+        plt.xlim([0, 10])
+        plt.ylim([0, 10])
+        plt.axis('equal')
         plt.show()
 
     def vertex_angle(self, P1, P2, P3):
@@ -139,66 +142,177 @@ class Path_Splining():
     def constrain_pi(self, theta):
         if theta > math.pi:
             theta = theta - 2 * math.pi
-        elif theta:
+        elif theta < -math.pi:
             theta = theta + 2 * math.pi
         return theta
 
-    def generate_spline(self):
-        """
-
-        :return:
-        """
+    def calculate_curve_exit(self, previous_waypoint, current_waypoint, next_waypoint):
         r = self._turn_radius
         # Part 1: Find the centre-point of the circle the path will trace.
-        # Get inverse gradient of current waypoint to previous waypoint
-        previous_point = [3.8, 1]
-        current_point = [3, 3.5]
-        next_point = [6, 5]
-        inv_grad_numerator = current_point[0] - previous_point[0]
-        inv_grad_denominator = current_point[1] - previous_point[1]
+        # Get perpedicular gradient of current waypoint to previous waypoint
+        inv_grad_numerator = current_waypoint[0] - previous_waypoint[0]
+        inv_grad_denominator = current_waypoint[1] - previous_waypoint[1]
         # Get 2 possible points along that gradient from current waypoint that are of minimum turning r distance
         gradient_angle = math.atan2(inv_grad_numerator, inv_grad_denominator)
-        print("Theta:", gradient_angle)
-        first_point = [current_point[0] - r * math.cos(gradient_angle), current_point[1] + r * math.sin(gradient_angle)]
-        second_point = [current_point[0] - r * math.cos(gradient_angle + math.pi), current_point[1] + r * math.sin(gradient_angle + math.pi)]
-        print("First point:", first_point)
-        print("Second point:", second_point)
+        first_point = [current_waypoint[0] - r * math.cos(gradient_angle),
+                       current_waypoint[1] + r * math.sin(gradient_angle)]
+        second_point = [current_waypoint[0] - r * math.cos(gradient_angle + math.pi),
+                        current_waypoint[1] + r * math.sin(gradient_angle + math.pi)]
         # Pick the point that is closer to the next waypoint
-        first_point_dist = math.sqrt((first_point[0] - next_point[0]) ** 2 + (first_point[1] - next_point[1]) ** 2)
-        second_point_dist = math.sqrt((second_point[0] - next_point[0]) ** 2 + (second_point[1] - next_point[1]) ** 2)
-        print("First dist:", first_point_dist)
-        print("Second dist:", second_point_dist)
+        first_point_dist = math.sqrt((first_point[0] - next_waypoint[0]) ** 2 + (first_point[1] - next_waypoint[1]) ** 2)
+        second_point_dist = math.sqrt((second_point[0] - next_waypoint[0]) ** 2 + (second_point[1] - next_waypoint[1]) ** 2)
         if first_point_dist <= second_point_dist:
             centre_point = first_point
         else:
             centre_point = second_point
-        # Find the vertex angle
-        # The vertex angle is how much angle of the circle the waypoint COULD lie on.
-        vertex_angle = self.vertex_angle(previous_point, current_point, next_point)
-        print("Vertex angle:", vertex_angle)
-        # Maybe try to for loop over x degree intervals
-
-        print("Centre point:", centre_point)
-        theta = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_point, n=0)
-        print("Theta before constraint:", theta)
+        theta = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_waypoint, n=0)
         # Constrain theta between -pi and pi
         if theta > math.pi or theta < -math.pi:
             theta = self.constrain_pi(theta)
 
-        print("Theta after constraint:", theta)
+        exit_point = [centre_point[0] + r * math.cos(theta + math.pi), centre_point[1] + r * math.sin(theta + math.pi)]
+        exit_angle = math.atan2(exit_point[1] - centre_point[1], exit_point[0] - centre_point[0])
+        exit_mirror_point = self.mirror_across_line(centre_point, next_waypoint, exit_point)
+        exit_mirror_angle = math.atan2(exit_mirror_point[1] - centre_point[1], exit_mirror_point[0] - centre_point[0])
 
-        point_to_mirror = [centre_point[0] - r * math.cos(theta), centre_point[1] - r * math.sin(theta)]
-        print("Intersection point:", point_to_mirror)
-        mirror_point = self.mirror_across_line(centre_point, next_point, point_to_mirror)
-        print("Opposite intersection point:", mirror_point)
+        current_point_angle = math.atan2(current_waypoint[1] - centre_point[1], current_waypoint[0] - centre_point[0])
 
-        true_angle = math.atan2(mirror_point[1] - centre_point[1], mirror_point[0] - centre_point[0])
-        print("Opposite theta:", true_angle)
+        print("\tTheta:", exit_angle, "\n\tPhi:", exit_mirror_angle, "\n\tCurrent:", current_point_angle)
+
+        centre_to_current_grad_num = current_waypoint[1] - centre_point[1]
+        centre_to_current_grad_den = current_waypoint[0] - centre_point[0]
+        centre_to_current_angle = math.atan2(centre_to_current_grad_num, centre_to_current_grad_den)
+        inv_centre_to_current_angle = math.atan2(-centre_to_current_grad_den, centre_to_current_grad_num)
+
+        previous_to_current_grad_num = current_waypoint[1] - previous_waypoint[1]
+        previous_to_current_grad_den = current_waypoint[0] - previous_waypoint[0]
+        previous_to_current_angle = math.atan2(previous_to_current_grad_num, previous_to_current_grad_den)
+
+        # Bit sketchy but it works for now check for errors
+        clockwise = False
+        if abs(inv_centre_to_current_angle - previous_to_current_angle) <= 0.0000001:
+            clockwise = True
+
+        exit_angle_diff = current_point_angle - exit_angle
+        exit_mirror_angle_diff = current_point_angle - exit_mirror_angle
+
+        print("\tGrad Inv Angle:\t", inv_centre_to_current_angle, "\n\tComparison Angle:", previous_to_current_angle)
+        print("\tClockwise:", clockwise)
+
+        print("\tExit Angle Diff:\t", exit_angle_diff, "\n\tExit Mirror Angle Diff:", exit_mirror_angle_diff)
+
+        if clockwise:
+            # All 5 cases where current point is positive angle
+            if current_point_angle > 0:
+                # CASE 1: Current positive, Both points negative
+                if exit_angle < 0 and exit_mirror_angle < 0:
+                    # CASE 1: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 2: Current positive, one point less positive, one point negative
+                if (exit_angle < current_point_angle and exit_angle > 0 and exit_mirror_angle < 0) or (exit_mirror_angle < current_point_angle and exit_mirror_angle > 0 and exit_angle < 0):
+                    # CASE 2: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 3: Current positive, both points less positive
+                if exit_angle < current_point_angle and exit_angle > 0 and exit_mirror_angle < current_point_angle and exit_mirror_angle > 0:
+                    # CASE 3: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 4: Current positive, one point more positive, one point less positive
+                if (exit_angle > current_point_angle and exit_mirror_angle < current_point_angle and exit_mirror_angle > 0) or (exit_mirror_angle > current_point_angle and exit_angle < current_point_angle and exit_angle > 0):
+                    # CASE 4: Pick the smallest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+                # CASE 5: Current positive, both points more positive
+                if exit_angle > current_point_angle and exit_mirror_angle > current_point_angle:
+                    # CASE 5: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+            else:
+                # CASE 6: Current negative, both points more negative
+                if exit_angle < current_point_angle and exit_mirror_angle < current_point_angle:
+                    # CASE 6: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 7: Current negative, one point more negative, one point less negative
+                if (exit_angle < current_point_angle and exit_mirror_angle < 0 and exit_mirror_angle > current_point_angle) or (exit_mirror_angle < current_point_angle and exit_angle < 0 and exit_angle > current_point_angle):
+                    # CASE 7: Pick the lowest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+                # CASE 8: Current negative, both points less negative
+                if exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > current_point_angle and exit_mirror_angle < 0:
+                    # CASE 8: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 9: Current negative, one point less negative, one point positive
+                if (exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > 0) or (exit_mirror_angle > current_point_angle and exit_mirror_angle < 0 and exit_angle > 0):
+                    # CASE 9: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 10: Current negative, both points positive
+                if exit_angle > 0 and exit_mirror_angle > 0:
+                    # CASE 10: Pick the largest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+
+
+    def improved_spline(self):
+        output_waypoints = []
+        centre_points = []
+        # Alternate between line and curve until finished
+        num_waypoints = len(self._waypoints)
+        num_straights = num_waypoints - 1
+        num_curves = num_waypoints - 2
+        print("Number of waypoints:", num_waypoints, "\n\tStraights:", num_straights, "\n\tCurves:", num_curves)
+        # Do num_curves pairs of straight then curves
+        temp_waypoint_start = self._waypoints[0]
+        for index in range(num_curves):
+            # Define start and end for straight line
+            waypoint_start = temp_waypoint_start
+            waypoint_end = self._waypoints[index + 1]
+            print(waypoint_start, " -> ", waypoint_end, sep="")
+            # Add the two waypoints to the output list
+            output_waypoints.append(waypoint_start)
+            output_waypoints.append(waypoint_end)
+            # From waypoint_start and waypoint_end, calculate the exit point of the curve that faces the next waypoint
+            next_waypoint = self._waypoints[index + 2]
+            curve_exit, centre_point = self.calculate_curve_exit(waypoint_start, waypoint_end, next_waypoint)
+            output_waypoints.append(centre_point)
+            print("\tCurve Exit:", curve_exit)
+            # Update new starting point to the curve exit
+            temp_waypoint_start = curve_exit
+
+        # Finish the path with a straight to the final waypoint
+        output_waypoints.append(temp_waypoint_start)
+        output_waypoints.append(self._waypoints[-1])
+        return output_waypoints, centre_points
 
 
 if "__main__" == __name__:
-    waypoints = [[5, 5], [7, 8], [10, 3], [4, 4]]
+    waypoints = [[1,1], [1,6], [4,6], [7,9], [8,4], [5, 3], [2, 4]]
     Spliner = Path_Splining()
     Spliner.add_waypoints(waypoints)
-    Spliner.print_waypoints()
-    Spliner.generate_spline()
+    output, centres = Spliner.improved_spline()
+    print(output)
+    Spliner.plot_waypoints(output)
