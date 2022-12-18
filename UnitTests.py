@@ -9,10 +9,19 @@ class UnitTests(unittest.TestCase):
                                   [[1, 1], [0, 0]],
                                   [[2, 1], [-5, 6]]]
         Spliner = Path_Splining()
-        for coord_pair in test_coordinates_pairs:
-            theta = Spliner.find_dual_perpendicular_angle(1, coord_pair[0], coord_pair[1])
 
-            self.assertTrue(-math.pi <= theta <= math.pi), "Not between -2pi and 2pi" # add assertion here
+    def test_spline_perpendicularity(self):
+        test_waypoint_lists = [
+                               [[4, 5], [7, 6], [6, 9], [4, 7], [2, 6], [0, 0]],
+                               [[0, 0], [1, 5]],
+                               [[5, 5.5], [10, 16], [20000, -2500]],
+                               [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]]  # Straight line of waypoints doesnt work
+                              ]
+        for waypoint_list in test_waypoint_lists:
+            Spliner = Path_Splining(waypoints=waypoint_list)
+            output, centres = Spliner.improved_spline(print_data=False)
+            Spliner.plot_waypoints(output)
+            self.assertTrue(Spliner.validate_perpendicularity(output, len(waypoint_list)))
 
 
 

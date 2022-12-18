@@ -97,20 +97,32 @@ class Path_Splining():
             return 0
 
     def find_dual_perpendicular_angle(self, radius, origin, point, n=0):
-        r = radius
-        xo = origin[0]
-        yo = origin[1]
-        xn = point[0]
-        yn = point[1]
+        """
 
-        arctan_numerator = yn - yo
-        arctan_denominator = xn - xo
+        :param radius:
+        :param origin:
+        :param point:
+        :param n:
+        :return:
+        """
+        r = radius
+        origin_x = origin[0]
+        origin_y = origin[1]
+        next_point_x = point[0]
+        next_point_y = point[1]
+
+        arctan_numerator = next_point_y - origin_y
+        arctan_denominator = next_point_x - origin_x
 
         arcsin_numerator = r
-        arcsin_denominator = math.sqrt(xn ** 2 - 2 * xn * xo + xo ** 2 + (yn - yo) ** 2)
+        arcsin_denominator = math.sqrt(next_point_x ** 2 - 2 * next_point_x * origin_x + origin_x ** 2 + (next_point_y - origin_y) ** 2)
         arcsin_stuff = arcsin_numerator / arcsin_denominator
 
-        numerator = - (2 * math.asin(arcsin_stuff) - 2 * math.atan2(arctan_numerator, arctan_denominator) + (self.sign(xn - xo) - 4 * n) * math.pi)
+        # Reference this desmos page: https://www.desmos.com/calculator/loniceqosa
+        # This equation comes from the solve function of my calendar. I solved for when M_NI was equal to M_IN and made
+        # t (theta) the subject. All this numerator denominator stuff is just to make the code more readable.
+        print("Next Point:", next_point_x, next_point_y, "\nOrigin:", origin_x, origin_y)
+        numerator = - (2 * math.asin(arcsin_stuff) - 2 * math.atan2(arctan_numerator, arctan_denominator) + (self.sign(next_point_x - origin_x) - 4 * n) * math.pi)
         denominator = 2
         theta = numerator / denominator
 
@@ -146,7 +158,7 @@ class Path_Splining():
             theta = theta + 2 * math.pi
         return theta
 
-    def calculate_curve_exit(self, previous_waypoint, current_waypoint, next_waypoint):
+    def calculate_curve_exit(self, previous_waypoint, current_waypoint, next_waypoint, print_data=False):
         # Define r as the minimum turn radius to make lines a bit neater.
         r = self._turn_radius
         # Part 1: Find the centre-point of the circle the path will trace.
@@ -169,7 +181,8 @@ class Path_Splining():
             centre_point = second_point
         # This point is going to be the centre of the circle the plane will trace as it angles towards the
         # next waypoint.
-        print("\tCentre Point: ", centre_point)
+        if print_data:
+            print("\tCentre Point: ", centre_point)
         # Use the find_dual_perpendicular_angle function to calculate the angle of the point at which the plane
         # stops tracing the circle and travels to the next waypoint
         exit_angle = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_waypoint, n=0)
@@ -188,35 +201,45 @@ class Path_Splining():
         # be the one we choose.
         exit_mirror_point = self.mirror_across_line(centre_point, next_waypoint, exit_point)
         exit_mirror_angle = math.atan2(exit_mirror_point[1] - centre_point[1], exit_mirror_point[0] - centre_point[0])
-
+        # Store the angle from the circle centre to the current waypoint, we'll use this to find which point the
+        # plane will fly over first and when we need to find which case it is. (What combination of points it is)
         current_point_angle = math.atan2(current_waypoint[1] - centre_point[1], current_waypoint[0] - centre_point[0])
 
-        print("\tExit Point:", exit_point, "\n\tExit Mirror Point:", exit_mirror_point)
-        print("\tExit Angle:", exit_angle, "\n\tExit Mirror Angle:", exit_mirror_angle, "\n\tCurrent Angle:", current_point_angle)
-
+        if print_data:
+            print("\tExit Point:", exit_point, "\n\tExit Mirror Point:", exit_mirror_point)
+            print("\tExit Angle:", exit_angle, "\n\tExit Mirror Angle:", exit_mirror_angle, "\n\tCurrent Angle:", current_point_angle)
+        # Calculate the perpendicular angle from the current waypoint to the circle centre
         centre_to_current_grad_num = current_waypoint[1] - centre_point[1]
         centre_to_current_grad_den = current_waypoint[0] - centre_point[0]
         inv_centre_to_current_angle = math.atan2(-centre_to_current_grad_den, centre_to_current_grad_num)
 
+        # Angle from the previous waypoint to the current waypoint
         previous_to_current_grad_num = current_waypoint[1] - previous_waypoint[1]
         previous_to_current_grad_den = current_waypoint[0] - previous_waypoint[0]
         previous_to_current_angle = math.atan2(previous_to_current_grad_num, previous_to_current_grad_den)
 
+        # We can say if the inverse gradient from the centre to the current waypoint is the same as the
+        # gradient from the previous waypoint to the current waypoint then we are heading in a clockwise direction
+        # Think of the right hand rule from physics to help understand this.
         # Bit sketchy but it works for now. I suppose this is due to some rounding or maybe atan2
         # as the values are technically the same but there must be a deep decimal value that differs.
         clockwise = False
         if abs(inv_centre_to_current_angle - previous_to_current_angle) <= 0.0000001:
             clockwise = True
 
-        print("\tGrad Inv Angle:\t", inv_centre_to_current_angle, "\n\tComparison Angle:", previous_to_current_angle)
-        print("\tClockwise:", clockwise)
+        if print_data:
+            print("\tGrad Inv Angle:\t", inv_centre_to_current_angle, "\n\tComparison Angle:", previous_to_current_angle)
+            print("\tClockwise:", clockwise)
 
-        # This is absolutely disgusting I know but it works. In the future this will be condensed.
+        # This collection of if else statements is absolutely disgusting I know but it works.
+        # In the future this will be condensed.
         if clockwise:
-            print("Clockwise")
+            if print_data:
+                print("Clockwise")
             # All 5 cases where current point is positive angle
             if current_point_angle > 0:
-                print("Positive angle")
+                if print_data:
+                    print("Positive angle")
                 # CASE 1: Current positive, Both points negative
                 if exit_angle < 0 and exit_mirror_angle < 0:
                     # CASE 1: Pick the largest value
@@ -260,11 +283,13 @@ class Path_Splining():
                     else:
                         return exit_point, centre_point
             else:
-                print("Negative angle")
+                if print_data:
+                    print("Negative angle")
                 # CASE 7: Current negative, both points more negative
                 if exit_angle < current_point_angle and exit_mirror_angle < current_point_angle:
                     # CASE 7: Pick the largest value
-                    print("Case 7")
+                    if print_data:
+                        print("Case 7")
                     if exit_angle > exit_mirror_angle:
                         return exit_point, centre_point
                     else:
@@ -272,7 +297,8 @@ class Path_Splining():
                 # CASE 8: Current negative, one point more negative, one point less negative
                 if (exit_angle < current_point_angle and exit_mirror_angle < 0 and exit_mirror_angle > current_point_angle) or (exit_mirror_angle < current_point_angle and exit_angle < 0 and exit_angle > current_point_angle):
                     # CASE 8: Pick the lowest value
-                    print("Case 8")
+                    if print_data:
+                        print("Case 8")
                     if exit_angle > exit_mirror_angle:
                         return exit_mirror_point, centre_point
                     else:
@@ -280,7 +306,8 @@ class Path_Splining():
                 # CASE 9: Current negative, both points less negative
                 if exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > current_point_angle and exit_mirror_angle < 0:
                     # CASE 9: Pick the largest value
-                    print("Case 9")
+                    if print_data:
+                        print("Case 9")
                     if exit_angle > exit_mirror_angle:
                         return exit_point, centre_point
                     else:
@@ -288,7 +315,8 @@ class Path_Splining():
                 # CASE 10: Current negative, one point less negative, one point positive
                 if (exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > 0) or (exit_mirror_angle > current_point_angle and exit_mirror_angle < 0 and exit_angle > 0):
                     # CASE 10: Pick the largest value
-                    print("Case 10")
+                    if print_data:
+                        print("Case 10")
                     if exit_angle > exit_mirror_angle:
                         return exit_point, centre_point
                     else:
@@ -296,13 +324,15 @@ class Path_Splining():
                 # CASE 11: Current negative, both points positive
                 if exit_angle > 0 and exit_mirror_angle > 0:
                     # CASE 11: Pick the largest value
-                    print("Case 11")
+                    if print_data:
+                        print("Case 11")
                     if exit_angle > exit_mirror_angle:
                         return exit_point, centre_point
                     else:
                         return exit_mirror_point, centre_point
                 # CASE 12: Current negative, one point positive, one point more negative
-                print("Case 12")
+                if print_data:
+                    print("Case 12")
                 if (exit_angle > 0 and exit_mirror_angle < current_point_angle) or (
                         exit_mirror_angle > 0 and exit_angle < current_point_angle):
                     # CASE 12: Pick the smallest value
@@ -399,32 +429,35 @@ class Path_Splining():
                         return exit_point, centre_point
 
 
-        return "wtf", "help"
+        return "NO CASE FOUND: MAJOR BUG", "help"
 
 
-    def improved_spline(self):
+    def improved_spline(self, print_data=False):
         output_waypoints = []
         centre_points = []
         # Alternate between line and curve until finished
         num_waypoints = len(self._waypoints)
         num_straights = num_waypoints - 1
         num_curves = num_waypoints - 2
-        print("Number of waypoints:", num_waypoints, "\n\tStraights:", num_straights, "\n\tCurves:", num_curves)
+        if print_data:
+            print("Number of waypoints:", num_waypoints, "\n\tStraights:", num_straights, "\n\tCurves:", num_curves)
         # Do num_curves pairs of straight then curves
         temp_waypoint_start = self._waypoints[0]
         for index in range(num_curves):
             # Define start and end for straight line
             waypoint_start = temp_waypoint_start
             waypoint_end = self._waypoints[index + 1]
-            print(waypoint_start, " -> ", waypoint_end, sep="")
+            if print_data:
+                print(waypoint_start, " -> ", waypoint_end, sep="")
             # Add the two waypoints to the output list
             output_waypoints.append(waypoint_start)
             output_waypoints.append(waypoint_end)
             # From waypoint_start and waypoint_end, calculate the exit point of the curve that faces the next waypoint
             next_waypoint = self._waypoints[index + 2]
-            curve_exit, centre_point = self.calculate_curve_exit(waypoint_start, waypoint_end, next_waypoint)
+            curve_exit, centre_point = self.calculate_curve_exit(waypoint_start, waypoint_end, next_waypoint, print_data)
             output_waypoints.append(centre_point)
-            print("\tCurve Exit:", curve_exit)
+            if print_data:
+                print("\tCurve Exit:", curve_exit)
             # Update new starting point to the curve exit
             temp_waypoint_start = curve_exit
 
@@ -433,13 +466,42 @@ class Path_Splining():
         output_waypoints.append(self._waypoints[-1])
         return output_waypoints, centre_points
 
+    def validate_perpendicularity(self, waypoints, initial_waypoint_count):
+        check_amount = initial_waypoint_count - 2
+        for index in range(check_amount):
+            prev1 = waypoints[index * 3]
+            curr1 = waypoints[index * 3 + 1]
+            next1 = waypoints[index * 3 + 2]
+            prev2 = waypoints[index * 3 + 2]
+            curr2 = waypoints[index * 3 + 3]
+            next2 = waypoints[index * 3 + 4]
+
+            previous_current_length = math.hypot(curr1[0] - prev1[0], curr1[1] - prev1[1])
+            current_next_length = math.hypot(next1[0] - curr1[0], next1[1] - curr1[1])
+            previous_next_length = math.hypot(next1[0] - prev1[0], next1[1] - prev1[1])
+            if (abs(previous_next_length ** 2) - abs(current_next_length ** 2 + previous_current_length ** 2)) > 0.0001:
+                print("Validation Check Index:", index, "| Intersection: 1 | FAILED!", "\n\t", previous_next_length ** 2, current_next_length ** 2 + previous_current_length ** 2)
+                print("\tWaypoints:", waypoints, initial_waypoint_count)
+                return False
+            print("Validation Check Index:", index, "| Intersection: 1 | OK!")
+            previous_current_length = math.hypot(curr2[0] - prev2[0], curr2[1] - prev2[1])
+            current_next_length = math.hypot(next2[0] - curr2[0], next2[1] - curr2[1])
+            previous_next_length = math.hypot(next2[0] - prev2[0], next2[1] - prev2[1])
+            if (abs(previous_next_length ** 2) - abs(current_next_length ** 2 + previous_current_length ** 2)) > 0.0001:
+                print("Validation Check Index:", index, "| Intersection: 2 | FAILED!", "\n\t", previous_next_length ** 2, current_next_length ** 2 + previous_current_length ** 2)
+                print("\tWaypoints:", waypoints, initial_waypoint_count)
+                return False
+            print("Validation Check:", index, "| Intersection: 2 | OK!")
+        return True
+
+
+
 
 if "__main__" == __name__:
-    waypoints = [[4,5] ,[7, 6], [6, 9], [4, 7], [2, 6]]
+    waypoints = [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]]
     Spliner = Path_Splining()
     Spliner.add_waypoints(waypoints)
-    output, centres = Spliner.improved_spline()
+    Spliner.plot_waypoints(waypoints)
+    output, centres = Spliner.improved_spline(print_data=True)
     Spliner.plot_waypoints(output)
-    Spliner.remove_waypoints([2])
-    output, centres = Spliner.improved_spline()
-    Spliner.plot_waypoints(output)
+    print(Spliner.validate_perpendicularity(output, len(waypoints)))
