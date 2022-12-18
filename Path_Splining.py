@@ -147,63 +147,76 @@ class Path_Splining():
         return theta
 
     def calculate_curve_exit(self, previous_waypoint, current_waypoint, next_waypoint):
+        # Define r as the minimum turn radius to make lines a bit neater.
         r = self._turn_radius
         # Part 1: Find the centre-point of the circle the path will trace.
-        # Get perpedicular gradient of current waypoint to previous waypoint
-        inv_grad_numerator = current_waypoint[0] - previous_waypoint[0]
-        inv_grad_denominator = current_waypoint[1] - previous_waypoint[1]
-        # Get 2 possible points along that gradient from current waypoint that are of minimum turning r distance
-        gradient_angle = math.atan2(inv_grad_numerator, inv_grad_denominator)
+        # Get perpendicular gradient of current waypoint to previous waypoint.
+        inverse_gradient_numerator = current_waypoint[0] - previous_waypoint[0]
+        inverse_gradient_denominator = current_waypoint[1] - previous_waypoint[1]
+        # Angle below in reference to unit circle.
+        gradient_angle = math.atan2(inverse_gradient_numerator, inverse_gradient_denominator)
+        # Get 2 possible points along that gradient from current waypoint that are of distance r.
         first_point = [current_waypoint[0] - r * math.cos(gradient_angle),
                        current_waypoint[1] + r * math.sin(gradient_angle)]
         second_point = [current_waypoint[0] - r * math.cos(gradient_angle + math.pi),
                         current_waypoint[1] + r * math.sin(gradient_angle + math.pi)]
-        # Pick the point that is closer to the next waypoint
+        # Pick the point that is closer to the next waypoint.
         first_point_dist = math.sqrt((first_point[0] - next_waypoint[0]) ** 2 + (first_point[1] - next_waypoint[1]) ** 2)
         second_point_dist = math.sqrt((second_point[0] - next_waypoint[0]) ** 2 + (second_point[1] - next_waypoint[1]) ** 2)
         if first_point_dist <= second_point_dist:
             centre_point = first_point
         else:
             centre_point = second_point
-        theta = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_waypoint, n=0)
-        # Constrain theta between -pi and pi
-        if theta > math.pi or theta < -math.pi:
-            theta = self.constrain_pi(theta)
+        # This point is going to be the centre of the circle the plane will trace as it angles towards the
+        # next waypoint.
+        print("\tCentre Point: ", centre_point)
+        # Use the find_dual_perpendicular_angle function to calculate the angle of the point at which the plane
+        # stops tracing the circle and travels to the next waypoint
+        exit_angle = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_waypoint, n=0)
+        # Constrain theta between -pi and pi. I have a feeling this will never run if the code is written correctly.
+        if exit_angle > math.pi or exit_angle < -math.pi:
+            exit_angle = self.constrain_pi(exit_angle)
 
-        exit_point = [centre_point[0] + r * math.cos(theta + math.pi), centre_point[1] + r * math.sin(theta + math.pi)]
-        exit_angle = math.atan2(exit_point[1] - centre_point[1], exit_point[0] - centre_point[0])
+        # If next waypoint x is less than centre point x, add pi to angle. This is because if the angle is in the
+        # or third quadrant we have to add pi to angle when calculating.
+        if next_waypoint[0] < centre_point[0]:
+            exit_point = [centre_point[0] - r * math.cos(exit_angle + math.pi), centre_point[1] - r * math.sin(exit_angle + math.pi)]
+        else:
+            exit_point = [centre_point[0] - r * math.cos(exit_angle), centre_point[1] - r * math.sin(exit_angle)]
+        # There exists another point that is its mirror across the line from the circle centre to the next waypoint.
+        # So we calculate that here and will have to test which one the plane will encounter first as that will
+        # be the one we choose.
         exit_mirror_point = self.mirror_across_line(centre_point, next_waypoint, exit_point)
         exit_mirror_angle = math.atan2(exit_mirror_point[1] - centre_point[1], exit_mirror_point[0] - centre_point[0])
 
         current_point_angle = math.atan2(current_waypoint[1] - centre_point[1], current_waypoint[0] - centre_point[0])
 
-        print("\tTheta:", exit_angle, "\n\tPhi:", exit_mirror_angle, "\n\tCurrent:", current_point_angle)
+        print("\tExit Point:", exit_point, "\n\tExit Mirror Point:", exit_mirror_point)
+        print("\tExit Angle:", exit_angle, "\n\tExit Mirror Angle:", exit_mirror_angle, "\n\tCurrent Angle:", current_point_angle)
 
         centre_to_current_grad_num = current_waypoint[1] - centre_point[1]
         centre_to_current_grad_den = current_waypoint[0] - centre_point[0]
-        centre_to_current_angle = math.atan2(centre_to_current_grad_num, centre_to_current_grad_den)
         inv_centre_to_current_angle = math.atan2(-centre_to_current_grad_den, centre_to_current_grad_num)
 
         previous_to_current_grad_num = current_waypoint[1] - previous_waypoint[1]
         previous_to_current_grad_den = current_waypoint[0] - previous_waypoint[0]
         previous_to_current_angle = math.atan2(previous_to_current_grad_num, previous_to_current_grad_den)
 
-        # Bit sketchy but it works for now check for errors
+        # Bit sketchy but it works for now. I suppose this is due to some rounding or maybe atan2
+        # as the values are technically the same but there must be a deep decimal value that differs.
         clockwise = False
         if abs(inv_centre_to_current_angle - previous_to_current_angle) <= 0.0000001:
             clockwise = True
 
-        exit_angle_diff = current_point_angle - exit_angle
-        exit_mirror_angle_diff = current_point_angle - exit_mirror_angle
-
         print("\tGrad Inv Angle:\t", inv_centre_to_current_angle, "\n\tComparison Angle:", previous_to_current_angle)
         print("\tClockwise:", clockwise)
 
-        print("\tExit Angle Diff:\t", exit_angle_diff, "\n\tExit Mirror Angle Diff:", exit_mirror_angle_diff)
-
+        # This is absolutely disgusting I know but it works. In the future this will be condensed.
         if clockwise:
+            print("Clockwise")
             # All 5 cases where current point is positive angle
             if current_point_angle > 0:
+                print("Positive angle")
                 # CASE 1: Current positive, Both points negative
                 if exit_angle < 0 and exit_mirror_angle < 0:
                     # CASE 1: Pick the largest value
@@ -239,42 +252,154 @@ class Path_Splining():
                         return exit_point, centre_point
                     else:
                         return exit_mirror_point, centre_point
+                # CASE 6: Current positive, one point more positive, one point negative
+                if (exit_angle > current_point_angle and exit_mirror_angle < 0) or (exit_mirror_angle > current_point_angle and exit_angle < 0):
+                    # CASE 6: Pick the smallest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
             else:
-                # CASE 6: Current negative, both points more negative
+                print("Negative angle")
+                # CASE 7: Current negative, both points more negative
+                if exit_angle < current_point_angle and exit_mirror_angle < current_point_angle:
+                    # CASE 7: Pick the largest value
+                    print("Case 7")
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 8: Current negative, one point more negative, one point less negative
+                if (exit_angle < current_point_angle and exit_mirror_angle < 0 and exit_mirror_angle > current_point_angle) or (exit_mirror_angle < current_point_angle and exit_angle < 0 and exit_angle > current_point_angle):
+                    # CASE 8: Pick the lowest value
+                    print("Case 8")
+                    if exit_angle > exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+                # CASE 9: Current negative, both points less negative
+                if exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > current_point_angle and exit_mirror_angle < 0:
+                    # CASE 9: Pick the largest value
+                    print("Case 9")
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 10: Current negative, one point less negative, one point positive
+                if (exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > 0) or (exit_mirror_angle > current_point_angle and exit_mirror_angle < 0 and exit_angle > 0):
+                    # CASE 10: Pick the largest value
+                    print("Case 10")
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 11: Current negative, both points positive
+                if exit_angle > 0 and exit_mirror_angle > 0:
+                    # CASE 11: Pick the largest value
+                    print("Case 11")
+                    if exit_angle > exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 12: Current negative, one point positive, one point more negative
+                print("Case 12")
+                if (exit_angle > 0 and exit_mirror_angle < current_point_angle) or (
+                        exit_mirror_angle > 0 and exit_angle < current_point_angle):
+                    # CASE 12: Pick the smallest value
+                    if exit_angle > exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+        else:
+            if current_point_angle > 0:
+                # CASE 1: Current positive, Both points negative
+                if exit_angle < 0 and exit_mirror_angle < 0:
+                    # CASE 1: Pick the largest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 2: Current positive, one point less positive, one point negative
+                if (exit_angle < current_point_angle and exit_angle > 0 and exit_mirror_angle < 0) or (exit_mirror_angle < current_point_angle and exit_mirror_angle > 0 and exit_angle < 0):
+                    # CASE 2: Pick the largest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 3: Current positive, both points less positive
+                if exit_angle < current_point_angle and exit_angle > 0 and exit_mirror_angle < current_point_angle and exit_mirror_angle > 0:
+                    # CASE 3: Pick the largest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 4: Current positive, one point more positive, one point less positive
+                if (exit_angle > current_point_angle and exit_mirror_angle < current_point_angle and exit_mirror_angle > 0) or (exit_mirror_angle > current_point_angle and exit_angle < current_point_angle and exit_angle > 0):
+                    # CASE 4: Pick the smallest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+                # CASE 5: Current positive, both points more positive
+                if exit_angle > current_point_angle and exit_mirror_angle > current_point_angle:
+                    # CASE 5: Pick the largest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_point, centre_point
+                    else:
+                        return exit_mirror_point, centre_point
+                # CASE 6: Current positive, one point more positive, one point negative
+                if (exit_angle > current_point_angle and exit_mirror_angle < 0) or (exit_mirror_angle > current_point_angle and exit_angle < 0):
+                    # CASE 6: Pick the smallest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+            else:
+                # CASE 7: Current negative, both points more negative
                 if exit_angle < current_point_angle and exit_mirror_angle < current_point_angle:
                     # CASE 6: Pick the largest value
-                    if exit_angle > exit_mirror_angle:
+                    if exit_angle < exit_mirror_angle:
                         return exit_point, centre_point
                     else:
                         return exit_mirror_point, centre_point
-                # CASE 7: Current negative, one point more negative, one point less negative
+                # CASE 8: Current negative, one point more negative, one point less negative
                 if (exit_angle < current_point_angle and exit_mirror_angle < 0 and exit_mirror_angle > current_point_angle) or (exit_mirror_angle < current_point_angle and exit_angle < 0 and exit_angle > current_point_angle):
                     # CASE 7: Pick the lowest value
-                    if exit_angle > exit_mirror_angle:
+                    if exit_angle < exit_mirror_angle:
                         return exit_mirror_point, centre_point
                     else:
                         return exit_point, centre_point
-                # CASE 8: Current negative, both points less negative
+                # CASE 9: Current negative, both points less negative
                 if exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > current_point_angle and exit_mirror_angle < 0:
                     # CASE 8: Pick the largest value
-                    if exit_angle > exit_mirror_angle:
+                    if exit_angle < exit_mirror_angle:
                         return exit_point, centre_point
                     else:
                         return exit_mirror_point, centre_point
-                # CASE 9: Current negative, one point less negative, one point positive
+                # CASE 10: Current negative, one point less negative, one point positive
                 if (exit_angle > current_point_angle and exit_angle < 0 and exit_mirror_angle > 0) or (exit_mirror_angle > current_point_angle and exit_mirror_angle < 0 and exit_angle > 0):
                     # CASE 9: Pick the largest value
-                    if exit_angle > exit_mirror_angle:
+                    if exit_angle < exit_mirror_angle:
                         return exit_point, centre_point
                     else:
                         return exit_mirror_point, centre_point
-                # CASE 10: Current negative, both points positive
+                # CASE 11: Current negative, both points positive
                 if exit_angle > 0 and exit_mirror_angle > 0:
                     # CASE 10: Pick the largest value
-                    if exit_angle > exit_mirror_angle:
+                    if exit_angle < exit_mirror_angle:
                         return exit_point, centre_point
                     else:
                         return exit_mirror_point, centre_point
+                # CASE 12: Current negative, one point positive, one point more negative
+                if (exit_angle > 0 and exit_mirror_angle < current_point_angle) or (exit_mirror_angle > 0 and exit_angle < current_point_angle):
+                    # CASE 12: Pick the smallest value
+                    if exit_angle < exit_mirror_angle:
+                        return exit_mirror_point, centre_point
+                    else:
+                        return exit_point, centre_point
+
+
+        return "wtf", "help"
 
 
     def improved_spline(self):
@@ -310,9 +435,11 @@ class Path_Splining():
 
 
 if "__main__" == __name__:
-    waypoints = [[1,1], [1,6], [4,6], [7,9], [8,4], [5, 3], [2, 4]]
+    waypoints = [[4,5] ,[7, 6], [6, 9], [4, 7], [2, 6]]
     Spliner = Path_Splining()
     Spliner.add_waypoints(waypoints)
     output, centres = Spliner.improved_spline()
-    print(output)
+    Spliner.plot_waypoints(output)
+    Spliner.remove_waypoints([2])
+    output, centres = Spliner.improved_spline()
     Spliner.plot_waypoints(output)
