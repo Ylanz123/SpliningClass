@@ -15,7 +15,10 @@ class UnitTests(unittest.TestCase):
                                [[4, 5], [7, 6], [6, 9], [4, 7], [2, 6], [0, 0]],
                                [[0, 0], [1, 5]],
                                [[5, 5.5], [10, 16], [20000, -2500]],
-                               [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]]  # Straight line of waypoints doesnt work
+                               [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]],  # Straight line of waypoints doesnt work
+                               [[40, 40], [40, 70], [70, 70], [70, 40]],
+                               [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]],
+                               [[-7, 0], [-5, 0], [-3, 0], [1, 2], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
                               ]
         for waypoint_list in test_waypoint_lists:
             Spliner = Path_Splining(waypoints=waypoint_list)
