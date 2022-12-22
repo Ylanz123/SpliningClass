@@ -8,7 +8,7 @@ class Path_Splining():
         This class contains all the methods responsible for creating and modifying a custom
         spline between waypoints.
     """
-    def __init__(self, turn_radius=0.8, boundary_points=[], waypoints=[], resolution=3, tolerance=0):
+    def __init__(self, turn_radius=1, boundary_points=[], waypoints=[], resolution=1, tolerance=0):
         """
         Initialiser method
             This method can be used to initialise the class with or without the parameters
@@ -19,6 +19,7 @@ class Path_Splining():
         boundary the spline path won't cross.
         :param waypoints: An array of [latitude, longitude] arrays that the spline path
         will intersect.
+        :param resolution: How many waypoints per metre we want. A higher value will give a higher resolution
         :returns: Doesn't return anything.
         """
         self._turn_radius = turn_radius
@@ -189,7 +190,7 @@ class Path_Splining():
         else:
             return second_point
 
-    def get_circle_direction(self, previous_waypoint, current_waypoint, centre_point, error, print_data=False):
+    def get_circle_direction(self, previous_waypoint, current_waypoint, centre_point, error, print_data=True):
         if print_data:
             print("Previous:", previous_waypoint)
             print("Current:", current_waypoint)
@@ -508,7 +509,60 @@ class Path_Splining():
         distance = math.sqrt((point_one[1] - point_two[1]) ** 2 + (point_one[0] - point_two[0]) ** 2)
         return distance
 
-    def interpolate_all_curves(self, waypoints, centre_points):
+    def get_angle_range(self, first_angle, second_angle, is_clockwise):
+        """
+        Returns negative angle if clockwise and positive if counter-clockwise in coordination with the unit circle
+        :param first_angle:
+        :param second_angle:
+        :param is_clockwise:
+        :return:
+        """
+        if first_angle > 0:
+            if second_angle > first_angle:
+                if is_clockwise:
+                    angle_range = second_angle - first_angle
+                else:
+                    angle_range = second_angle - first_angle
+            else:
+                if is_clockwise:
+                    angle_range = first_angle - second_angle
+                else:
+                    angle_range = 2 * math.pi - first_angle + second_angle
+        else:
+            print("First angle negative")
+            if second_angle > first_angle:
+                print("Second angle bigger")
+                if is_clockwise:
+                    print("Clockwise")
+                    angle_range = 2 * math.pi + first_angle - second_angle
+                else:
+                    angle_range = second_angle - first_angle
+            else:
+                print("Second angle smaller")
+                if is_clockwise:
+                    angle_range = first_angle - second_angle
+                else:
+                    angle_range = 2 * math.pi - first_angle + second_angle
+        if is_clockwise:
+            angle_range = - angle_range
+        return angle_range
+
+    def get_arc_length(self, angle_range, radius):
+        circumference = radius * 2 * math.pi
+        angle_range_fraction = angle_range / (2 * math.pi)
+        arc_length = circumference * angle_range_fraction
+        return abs(arc_length)
+
+    def get_angle_interval(self, angle_range, arc_length, resolution):
+        points_count = math.floor(arc_length * resolution)
+        if points_count != 0:
+            angle_interval = angle_range / points_count
+            return angle_interval
+        else:
+            return angle_range
+
+    def interpolate_all_curves(self, waypoints, centre_points, resolution, print_data=False):
+        r = self._turn_radius
         # Get index of curve points
         curve_indices = []
         for index in range(len(centre_points)):
@@ -516,6 +570,8 @@ class Path_Splining():
                 curve_indices.append(index + 1)
         print(curve_indices)
         waypoint_index_position = 1
+        output = waypoints[:]
+        output_injection_matrix = []
         for index in range(len(centre_points)):
             centre_point_data = centre_points[index]
             if centre_point_data[0] == "curve":
@@ -525,28 +581,52 @@ class Path_Splining():
                 first_angle = math.atan2(corresponding_points[0][1] - centre_point[1], corresponding_points[0][0] - centre_point[0])
                 second_angle = math.atan2(corresponding_points[1][1] - centre_point[1], corresponding_points[1][0] - centre_point[0])
                 # To figure out which direction to go around the circle to find the arc length
-                clockwise = self.get_circle_direction(previous_waypoint=waypoints[waypoint_index_position - 1], current_waypoint=corresponding_points[0], centre_point=centre_point, error=1e-5)
+                is_clockwise = self.get_circle_direction(previous_waypoint=waypoints[waypoint_index_position - 1], current_waypoint=corresponding_points[0], centre_point=centre_point, error=1e-5)
+                angle_range = self.get_angle_range(first_angle, second_angle, is_clockwise)
+                arc_length = self.get_arc_length(angle_range, self._turn_radius)
+                if print_data:
+                    print("Waypoint:", corresponding_points[0], corresponding_points[1])
+                    print("First angle:", first_angle, "Second angle:", second_angle)
+                    print("Angle range:", angle_range, angle_range * 180 / math.pi)
+                    print("Arc length:", arc_length)
+                # Find the angle interval using the arc length and resolution
+                angle_interval = self.get_angle_interval(angle_range, arc_length, self._resolution)
+                # Using the resolution sample a bunch of points along the curve
+                current_additional_angle = angle_interval
+                print("First angle:", first_angle, "Second angle:", second_angle)
+                injection_section = []
+                print("Range:", angle_range, "| Interval:", angle_interval)
+                while abs(current_additional_angle) < abs(angle_range):
+                    print("\tMax angle:", angle_range, "| Current angle:", current_additional_angle)
+                    sample_point = [centre_point[0] + r * math.cos(first_angle + current_additional_angle), centre_point[1] + r * math.sin(first_angle + current_additional_angle)]
+                    injection_point_data = [waypoint_index_position + 1, sample_point]
+                    injection_section.insert(0, injection_point_data)
+                    current_additional_angle += angle_interval
+                output_injection_matrix.append(injection_section)
                 waypoint_index_position += 1
-
             waypoint_index_position += 1
+        # Inject new sampled points into output along with original waypoints
+        print("Injection Matrix:", output_injection_matrix)
+        output_injection_matrix = output_injection_matrix[::-1]  # Reverse it so adding points doesn't mess with indexing
+        for injection_section in output_injection_matrix:
+            for sample_point in injection_section:
+                output.insert(sample_point[0], sample_point[1])
+                print("Point inserting:", sample_point)
+        return output
 
-        return waypoints
-
-
-    def check_minimum_waypoint_radius(self, waypoints=[], print_data=False):
-        for index in range(len(self._waypoints) - 1):
-            current_waypoint = self._waypoints[index]
-            next_waypoint = self._waypoints[index + 1]
+    def check_minimum_waypoint_radius(self, waypoints=[], print_data=True):
+        for index in range(len(waypoints) - 1):
+            current_waypoint = waypoints[index]
+            next_waypoint = waypoints[index + 1]
             distance = self.distance_between_two_points(current_waypoint, next_waypoint)
             if print_data:
                 print("Index:", index, "| Distance:", distance)
             if distance < self._turn_radius:
                 raise ValueError("Waypoints too close together.")
 
-
     def improved_spline(self, print_data=False):
         # First check that no waypoints are within the minimum turn radius of each other
-        self.check_minimum_waypoint_radius(waypoints=waypoints)
+        self.check_minimum_waypoint_radius(waypoints=self._waypoints)
         output_waypoints = []
         centre_points = []
         # Alternate between line and curve until finished
@@ -588,10 +668,13 @@ class Path_Splining():
             if current_waypoint == next_waypoint:
                 output_waypoints.pop(index)
 
-        # Time to interpolate on the curves
-        output_waypoints = self.interpolate_all_curves(output_waypoints, centre_points)
+        # Check perpendicularity, if false, probably means that the turn radius is too large / points are too close
+        # together.
 
+        # Time to interpolate on the curves
+        output_waypoints = self.interpolate_all_curves(output_waypoints, centre_points, self._resolution)
         return output_waypoints, centre_points
+
 
     def validate_perpendicularity(self, waypoints, initial_waypoint_count):
         check_amount = initial_waypoint_count - 2
@@ -627,8 +710,9 @@ if "__main__" == __name__:
     waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
     waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
     waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
-    Spliner = Path_Splining(waypoints=waypoints, turn_radius=0.7)
-    output, centres = Spliner.improved_spline(print_data=False)
+    Spliner = Path_Splining(waypoints=waypoints, turn_radius=0.7, resolution=3)
+    output, centres = Spliner.improved_spline()
     print("Waypoints:", output)
     print("Circle Centres:", centres)
     Spliner.plot_waypoints(output, centres)
+
