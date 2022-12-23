@@ -162,10 +162,11 @@ class Path_Splining():
         return [mirrored_x, mirrored_y]
 
     def constrain_pi(self, theta):
-        if theta > math.pi:
-            theta = theta - 2 * math.pi
-        elif theta < -math.pi:
-            theta = theta + 2 * math.pi
+        while theta < - math.pi or theta > math.pi:
+            if theta < - math.pi:
+                theta = theta + 2 * math.pi
+            if theta > math.pi:
+                theta = theta - 2 * math.pi
         return theta
 
     def get_closest_centre_point(self, previous_waypoint, current_waypoint, next_waypoint, r):
@@ -190,7 +191,7 @@ class Path_Splining():
         else:
             return second_point
 
-    def get_circle_direction(self, previous_waypoint, current_waypoint, centre_point, error, print_data=True):
+    def get_circle_direction(self, previous_waypoint, current_waypoint, centre_point, error, print_data=False):
         if print_data:
             print("Previous:", previous_waypoint)
             print("Current:", current_waypoint)
@@ -229,14 +230,17 @@ class Path_Splining():
         # Use the find_dual_perpendicular_angle function to calculate the angle of the point at which the plane
         # stops tracing the circle and travels to the next waypoint
         exit_angle = self.find_dual_perpendicular_angle(radius=r, origin=centre_point, point=next_waypoint, n=0)
-        # Constrain theta between -pi and pi. I have a feeling this will never run if the code is written correctly.
-        if exit_angle > math.pi or exit_angle < -math.pi:
-            exit_angle = self.constrain_pi(exit_angle)
 
         # If next waypoint x is less than centre point x, add pi to angle. This is because if the angle is in the
         # or third quadrant we have to add pi to angle when calculating.
         if next_waypoint[0] < centre_point[0]:
             exit_angle = exit_angle + math.pi
+            exit_angle = self.constrain_pi(exit_angle)
+
+        # Constrain theta between -pi and pi.
+        if exit_angle > math.pi or exit_angle < -math.pi:
+            raise ValueError("Constrain to PI error.")
+
 
         exit_point = [centre_point[0] + r * math.cos(exit_angle), centre_point[1] + r * math.sin(exit_angle)]
         # There exists another point that is its mirror across the line from the circle centre to the next waypoint.
@@ -529,16 +533,12 @@ class Path_Splining():
                 else:
                     angle_range = 2 * math.pi - first_angle + second_angle
         else:
-            print("First angle negative")
             if second_angle > first_angle:
-                print("Second angle bigger")
                 if is_clockwise:
-                    print("Clockwise")
                     angle_range = 2 * math.pi + first_angle - second_angle
                 else:
                     angle_range = second_angle - first_angle
             else:
-                print("Second angle smaller")
                 if is_clockwise:
                     angle_range = first_angle - second_angle
                 else:
@@ -568,7 +568,6 @@ class Path_Splining():
         for index in range(len(centre_points)):
             if centre_points[index][0] == "curve":
                 curve_indices.append(index + 1)
-        print(curve_indices)
         waypoint_index_position = 1
         output = waypoints[:]
         output_injection_matrix = []
@@ -593,11 +592,8 @@ class Path_Splining():
                 angle_interval = self.get_angle_interval(angle_range, arc_length, self._resolution)
                 # Using the resolution sample a bunch of points along the curve
                 current_additional_angle = angle_interval
-                print("First angle:", first_angle, "Second angle:", second_angle)
                 injection_section = []
-                print("Range:", angle_range, "| Interval:", angle_interval)
                 while abs(current_additional_angle) < abs(angle_range):
-                    print("\tMax angle:", angle_range, "| Current angle:", current_additional_angle)
                     sample_point = [centre_point[0] + r * math.cos(first_angle + current_additional_angle), centre_point[1] + r * math.sin(first_angle + current_additional_angle)]
                     injection_point_data = [waypoint_index_position + 1, sample_point]
                     injection_section.insert(0, injection_point_data)
@@ -606,27 +602,39 @@ class Path_Splining():
                 waypoint_index_position += 1
             waypoint_index_position += 1
         # Inject new sampled points into output along with original waypoints
-        print("Injection Matrix:", output_injection_matrix)
         output_injection_matrix = output_injection_matrix[::-1]  # Reverse it so adding points doesn't mess with indexing
         for injection_section in output_injection_matrix:
             for sample_point in injection_section:
                 output.insert(sample_point[0], sample_point[1])
-                print("Point inserting:", sample_point)
         return output
 
-    def check_minimum_waypoint_radius(self, waypoints=[], print_data=True):
+    def check_minimum_waypoint_radius(self, waypoints=[], print_data=False):
         for index in range(len(waypoints) - 1):
             current_waypoint = waypoints[index]
             next_waypoint = waypoints[index + 1]
             distance = self.distance_between_two_points(current_waypoint, next_waypoint)
             if print_data:
-                print("Index:", index, "| Distance:", distance)
+                print("Index:", index, "| Distance:", distance / 2)
             if distance < self._turn_radius:
                 raise ValueError("Waypoints too close together.")
 
+    def get_maximum_turn_radius(self, waypoints=[]):
+        # Check that there are at least two waypoints
+        if len(waypoints) < 2:
+            return None
+        # Define first distance and divide by two
+        maximum_turn_radius = self.distance_between_two_points(waypoints[0], waypoints[1]) / 2
+        for index in range(1, len(waypoints) - 1):
+            current_waypoint = waypoints[index]
+            next_waypoint = waypoints[index + 1]
+            distance = self.distance_between_two_points(current_waypoint, next_waypoint)
+            if distance / 2 < maximum_turn_radius:
+                maximum_turn_radius = distance / 2
+        return maximum_turn_radius
+
     def improved_spline(self, print_data=False):
         # First check that no waypoints are within the minimum turn radius of each other
-        self.check_minimum_waypoint_radius(waypoints=self._waypoints)
+        self.check_minimum_waypoint_radius(waypoints=self._waypoints, print_data=False)
         output_waypoints = []
         centre_points = []
         # Alternate between line and curve until finished
@@ -648,7 +656,7 @@ class Path_Splining():
             output_waypoints.append(waypoint_end)
             # From waypoint_start and waypoint_end, calculate the exit point of the curve that faces the next waypoint
             next_waypoint = self._waypoints[index + 2]
-            curve_exit, centre_point = self.calculate_curve_exit(waypoint_start, waypoint_end, next_waypoint, print_data)
+            curve_exit, centre_point = self.calculate_curve_exit(waypoint_start, waypoint_end, next_waypoint)
             centre_points.append(centre_point)
             if print_data:
                 print("\tCurve Exit:", curve_exit)
@@ -674,7 +682,6 @@ class Path_Splining():
         # Time to interpolate on the curves
         output_waypoints = self.interpolate_all_curves(output_waypoints, centre_points, self._resolution)
         return output_waypoints, centre_points
-
 
     def validate_perpendicularity(self, waypoints, initial_waypoint_count):
         check_amount = initial_waypoint_count - 2
@@ -704,13 +711,19 @@ class Path_Splining():
             print("Validation Check:", index, "| Intersection: 2 | OK!")
         return True
 
+# GENERAL USE FUNCTIONS:
+# Below are some general functions the Spline class uses and ones users can use for testing or for the passing
+# of individual test cases. A lot of these functions are really just specialised math functions, that allow printing.
 
 if "__main__" == __name__:
-    waypoints = [[4.0, 5.0], [7.0, 6.0], [6.0, 9.0], [4.0, 7.0], [2.0, 6], [1, 3], [-3, 0], [-4, 5]]
-    waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
-    waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
-    waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
-    Spliner = Path_Splining(waypoints=waypoints, turn_radius=0.7, resolution=3)
+    #waypoints = [[4.0, 5.0], [7.0, 6.0], [6.0, 9.0], [4.0, 7.0], [2.0, 6], [1, 3], [-3, 0], [-4, 5]]
+    #waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
+    #waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
+    #waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
+    waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-1, 0]]
+    Spliner = Path_Splining(waypoints=waypoints, turn_radius=2.8, resolution=1)
+    max_turn_radius = Spliner.get_maximum_turn_radius(waypoints=waypoints)
+    print("Max Turn Radius:", max_turn_radius)
     output, centres = Spliner.improved_spline()
     print("Waypoints:", output)
     print("Circle Centres:", centres)
