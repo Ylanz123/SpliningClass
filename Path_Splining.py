@@ -772,8 +772,8 @@ if "__main__" == __name__:
     #waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
     #waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
     waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
-    Spliner = Path_Splining(waypoints=waypoints, turn_radius=2.8, resolution=1)
-    Spliner.print_waypoints()
-    output, centres = Spliner.generate_spline()
+    Spline_Generator = Path_Splining(waypoints=[], turn_radius=0, resolution=0, tolerance=0, boundary_points=[])
+    Spline_Generator.print_waypoints()
+    output, centres = Spline_Generator.generate_spline()
     plot_waypoints(output, centres)
 
