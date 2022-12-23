@@ -23,9 +23,9 @@ class UnitTests(unittest.TestCase):
                               ]
         for waypoint_list in test_waypoint_lists:
             Spliner = Path_Splining(waypoints=waypoint_list)
-            output, centres = Spliner.improved_spline(print_data=False)
+            output, centres = Spliner.generate_spline(print_data=False)
             Spliner.plot_waypoints(output)
-            self.assertTrue(Spliner.validate_perpendicularity(output, len(waypoint_list)))
+            self.assertTrue(validate_perpendicularity(output, len(waypoint_list)))
 
 
 
