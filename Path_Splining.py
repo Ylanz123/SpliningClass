@@ -72,6 +72,8 @@ class Path_Splining():
         Prints the current waypoints saved to the class instance.
         """
         print("Instance Waypoints:")
+        if len(self._waypoints) == 0:
+            print("\tNo waypoints saved.")
         for waypoint in self._waypoints:
             print("\t", waypoint, sep="")
 
@@ -81,7 +83,12 @@ class Path_Splining():
         :param print_data: A flag that will return information about all sorts of things. This is a debugging resource.
         :return: A list of waypoints that follow a spline and a list of centre-point coordinates for each curve.
         """
+        # Check there's at least two waypoints
+        if len(self._waypoints) < 2:
+            raise ValueError("There are less than two waypoints.")
         # First check that no waypoints are within the minimum turn radius of each other
+        if self._turn_radius > get_maximum_turn_radius(self._waypoints):
+            raise ValueError("The minimum turn radius is too large.")
         check_minimum_waypoint_radius(waypoints=self._waypoints, turn_radius=self._turn_radius, print_data=False)
         output_waypoints = []
         centre_points = []
@@ -767,12 +774,13 @@ def plot_waypoints(waypoints_to_plot, centre_points=[]):
 
 
 if "__main__" == __name__:
-    #waypoints = [[4.0, 5.0], [7.0, 6.0], [6.0, 9.0], [4.0, 7.0], [2.0, 6], [1, 3], [-3, 0], [-4, 5]]
-    #waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
-    #waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
-    #waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
-    waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
-    Spline_Generator = Path_Splining(waypoints=[], turn_radius=0, resolution=0, tolerance=0, boundary_points=[])
+    # waypoints = [[4.0, 5.0], [7.0, 6.0], [6.0, 9.0], [4.0, 7.0], [2.0, 6], [1, 3], [-3, 0], [-4, 5]]
+    # waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
+    # waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
+    waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
+    # waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
+    # waypoints = [[5, 2], [10, 9], [13, 6]]
+    Spline_Generator = Path_Splining(waypoints=waypoints, turn_radius=get_maximum_turn_radius(waypoints=waypoints), resolution=get_maximum_turn_radius(waypoints), tolerance=0, boundary_points=[])
     Spline_Generator.print_waypoints()
     output, centres = Spline_Generator.generate_spline()
     plot_waypoints(output, centres)
