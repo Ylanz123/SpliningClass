@@ -4,9 +4,8 @@ import math
 
 class Path_Splining():
     """
-    Path splining class
-        This class contains all the methods responsible for creating and modifying a custom
-        spline between waypoints.
+    This class contains all the methods responsible for creating and modifying a custom
+    spline between waypoints.
     """
     def __init__(self, turn_radius=1, boundary_points=[], waypoints=[], resolution=1, tolerance=0):
         """
@@ -19,23 +18,22 @@ class Path_Splining():
         boundary the spline path won't cross.
         :param waypoints: An array of [latitude, longitude] arrays that the spline path
         will intersect.
-        :param resolution: How many waypoints per metre we want. A higher value will give a higher resolution
-        :returns: Doesn't return anything.
+        :param resolution: How many waypoints per metre we want. A higher value will give a higher resolution.
+        :param tolerance: How many metres within the boundary the spline generator will allow.
         """
         self._turn_radius = turn_radius
         self._boundary_points = boundary_points
         self._waypoints = waypoints
         self._resolution = resolution
+        self._tolerance = tolerance
 
     def add_waypoints(self, waypoints=[]):
         """
-        Add waypoint method
-            This method allows the adding of waypoints to the current waypoint list. They
-            will be appended after all the previous waypoints.
+        This method allows the adding of waypoints to the current waypoint list. They
+        will be appended after all the previous waypoints.
         :param waypoints: An array of [latitude, longitude] arrays in the order the vehicle
         has to travel. As an example index 0 will be the first waypoint to go to and index
         1 the second waypoint and so on.
-        :return:
         """
         # Loop through each waypoint and append it to self._waypoints
         for waypoint in waypoints:
@@ -43,12 +41,10 @@ class Path_Splining():
 
     def remove_waypoints(self, indices=[]):
         """
-        Remove waypoints method
-            This method allows users to remove waypoints by single index or multiple
-            indices at a time.
+        This method allows users to remove waypoints by single index or multiple
+        indices at a time.
         :param indices: An array of indices to remove from the waypoint list.
         [firstIndex, secondIndex, ...]
-        :return:
         """
         # Sort the indices array in descending order
         indices.sort(reverse=True)
@@ -57,16 +53,34 @@ class Path_Splining():
             self._waypoints.pop(index)
 
     def add_boundary(self, boundary_points=[]):
+        """
+        This method replaces the class instance's boundary points with the list provided by the arguments.
+        :param boundary_points: A list of [lat, lon] arrays that create a closed boundary. The final point can equal
+        the initial point but doesn't have to. The program will connect the ends together anyway.
+        """
         self._boundary_points = boundary_points
 
     def edit_turn_radius(self, turn_radius):
+        """
+        Replaces the class instance's minimum turn radius with the argument given.
+        :param turn_radius: Minimum turn radius in metres.
+        """
         self._turn_radius = turn_radius
 
     def print_waypoints(self):
-        print("Current Waypoints:")
-        print(self._waypoints)
+        """
+        Prints the current waypoints saved to the class instance.
+        """
+        print("Instance Waypoints:")
+        for waypoint in self._waypoints:
+            print("\t", waypoint, sep="")
 
     def generate_spline(self, print_data=False):
+        """
+        Generates a spline for the class instance's waypoints.
+        :param print_data: A flag that will return information about all sorts of things. This is a debugging resource.
+        :return: A list of waypoints that follow a spline and a list of centre-point coordinates for each curve.
+        """
         # First check that no waypoints are within the minimum turn radius of each other
         check_minimum_waypoint_radius(waypoints=self._waypoints, turn_radius=self._turn_radius, print_data=False)
         output_waypoints = []
@@ -120,6 +134,13 @@ class Path_Splining():
 # of individual test cases. A lot of these functions are really just specialised math functions, that allow printing.
 
 def check_minimum_waypoint_radius(waypoints, turn_radius, print_data=False):
+    """
+    Checks the distances between consecutive points and raises an error if any are within two times the given radius
+    :param waypoints: A list of [lat, lon] coordinates.
+    :param turn_radius: The minimum turn radius in metres.
+    :param print_data: A flag that will return information about all sorts of things. This is a debugging resource.
+    :return:
+    """
     for index in range(len(waypoints) - 1):
         current_waypoint = waypoints[index]
         next_waypoint = waypoints[index + 1]
@@ -130,10 +151,21 @@ def check_minimum_waypoint_radius(waypoints, turn_radius, print_data=False):
             raise ValueError("Waypoints too close together.")
 
 def distance_between_two_points(point_one, point_two):
+    """
+    Gets the distance between two points.
+    :param point_one: [x1, y1]
+    :param point_two: [x2, y2]
+    :return: Distance between two points.
+    """
     distance = math.sqrt((point_one[1] - point_two[1]) ** 2 + (point_one[0] - point_two[0]) ** 2)
     return distance
 
 def get_maximum_turn_radius(waypoints):
+    """
+    Finds the maximum turn radius for a given list of points.
+    :param waypoints: A list of [lat, lon] coordinates.
+    :return: Maximum possible turn radius.
+    """
     # Check that there are at least two waypoints
     if len(waypoints) < 2:
         return None
@@ -148,6 +180,11 @@ def get_maximum_turn_radius(waypoints):
     return maximum_turn_radius
 
 def constrain_pi(theta):
+    """
+    Will constrain a given angle to between pi and -pi.
+    :param theta: Angle in radians to constrain.
+    :return: The constrained angle in radians.
+    """
     while theta < - math.pi or theta > math.pi:
         if theta < - math.pi:
             theta = theta + 2 * math.pi
@@ -156,6 +193,13 @@ def constrain_pi(theta):
     return theta
 
 def sign(x):
+    """
+    If x is above zero, return 1.
+    If x is zero, return 0.
+    If x is below zero, return -1.
+    :param x: A number.
+    :return: The sign of x.
+    """
     if x > 0:
         return 1
     elif x < 0:
@@ -164,6 +208,14 @@ def sign(x):
         return 0
 
 def vertex_angle(point_one, point_two, point_three):
+    """
+    Finds the angle between three points.
+    :param point_one: [x, y]
+    :param point_two: [x, y]
+    :param point_three: [x, y]
+    :return: An angle in radians.
+    """
+    math.hypot()
     dist_one_two = distance_between_two_points(point_one, point_two)
     dist_one_three = distance_between_two_points(point_one, point_three)
     dist_two_three = distance_between_two_points(point_two, point_three)
@@ -721,6 +773,7 @@ if "__main__" == __name__:
     #waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
     waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
     Spliner = Path_Splining(waypoints=waypoints, turn_radius=2.8, resolution=1)
+    Spliner.print_waypoints()
     output, centres = Spliner.generate_spline()
     plot_waypoints(output, centres)
 
