@@ -2,7 +2,7 @@ from __future__ import division, print_function
 import matplotlib.pyplot as plt
 import math
 
-class Path_Splining():
+class SplineGenerator:
     """
     This class contains all the methods responsible for creating and modifying a custom
     spline between waypoints.
@@ -777,10 +777,10 @@ if "__main__" == __name__:
     # waypoints = [[4.0, 5.0], [7.0, 6.0], [6.0, 9.0], [4.0, 7.0], [2.0, 6], [1, 3], [-3, 0], [-4, 5]]
     # waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
     # waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
-    waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
-    # waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
+    # waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
+    waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
     # waypoints = [[5, 2], [10, 9], [13, 6]]
-    Spline_Generator = Path_Splining(waypoints=waypoints, turn_radius=get_maximum_turn_radius(waypoints=waypoints), resolution=get_maximum_turn_radius(waypoints), tolerance=0, boundary_points=[])
+    Spline_Generator = SplineGenerator(waypoints=waypoints, turn_radius=get_maximum_turn_radius(waypoints=waypoints), resolution=2, tolerance=0, boundary_points=[])
     Spline_Generator.print_waypoints()
     output, centres = Spline_Generator.generate_spline()
     plot_waypoints(output, centres)

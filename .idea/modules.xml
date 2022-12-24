@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/SpliningClass.iml" filepath="$PROJECT_DIR$/.idea/SpliningClass.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../SplineGenerator/.idea/SplineGenerator.iml" filepath="$PROJECT_DIR$/../SplineGenerator/.idea/SplineGenerator.iml" />
     </modules>
   </component>
 </project>

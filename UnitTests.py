@@ -1,6 +1,6 @@
 import unittest
 import math
-from Path_Splining import Path_Splining
+from SplineGenerator import SplineGenerator
 
 
 class UnitTests(unittest.TestCase):
@@ -8,7 +8,7 @@ class UnitTests(unittest.TestCase):
         test_coordinates_pairs = [[[0, 0], [1, 1]],
                                   [[1, 1], [0, 0]],
                                   [[2, 1], [-5, 6]]]
-        Spliner = Path_Splining()
+        Spliner = SplineGenerator()
 
     def test_spline_perpendicularity(self):
         test_waypoint_lists = [
@@ -22,7 +22,7 @@ class UnitTests(unittest.TestCase):
                                [[5, 10], [9, 19], [12, 14], [8, 6], [3, -4], [-1, 0]]
                               ]
         for waypoint_list in test_waypoint_lists:
-            Spliner = Path_Splining(waypoints=waypoint_list)
+            Spliner = SplineGenerator(waypoints=waypoint_list)
             output, centres = Spliner.generate_spline(print_data=False)
             Spliner.plot_waypoints(output)
             self.assertTrue(validate_perpendicularity(output, len(waypoint_list)))
