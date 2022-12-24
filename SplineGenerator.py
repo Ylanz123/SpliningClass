@@ -266,12 +266,26 @@ def get_angle_range(first_angle, second_angle, is_clockwise):
     return angle_range
 
 def get_arc_length(angle_range, radius):
+    """
+    Returns the arc length of an angle range given a particular radius.
+    :param angle_range: An amount of angle in radians.
+    :param radius: Circle radius.
+    :return: Arc length.
+    """
     circumference = radius * 2 * math.pi
     angle_range_fraction = angle_range / (2 * math.pi)
     arc_length = circumference * angle_range_fraction
     return abs(arc_length)
 
 def get_angle_interval(angle_range, arc_length, resolution):
+    """
+    Returns the interval for an arc length given a resolution.
+    :param angle_range: Range of angle in radians to return if there's no room for any points.
+    :param arc_length: The arc length of the curve.
+    :param resolution: A resolution of how many points per unit.
+    :return: Angle interval for each point interpolated on the curve. Will return the angle range given if no
+    points can fit.
+    """
     points_count = math.floor(arc_length * resolution)
     if points_count != 0:
         angle_interval = angle_range / points_count
@@ -279,7 +293,17 @@ def get_angle_interval(angle_range, arc_length, resolution):
     else:
         return angle_range
 
-def get_circle_direction(previous_waypoint, current_waypoint, centre_point, error, print_data=False):
+def get_circle_direction(previous_waypoint, current_waypoint, centre_point, error=1e-8, print_data=False):
+    """
+    Finds the direction on a circle the plane would travel if entering from the previous waypoint to its current
+    waypoint.
+    :param previous_waypoint: [lat, lon]. The previous waypoint the plane is coming from.
+    :param current_waypoint: [lat, lon]. Current waypoint the plane is going through.
+    :param centre_point: [lat, lon]. The centre point of the curve the plane travels on.
+    :param error: The tolerance of difference between atan2 rounding. 1e-8 is a good base.
+    :param print_data: A flag that will return information about all sorts of things. This is a debugging resource.
+    :return: Returns true if clockwise and false if counter-clockwise.
+    """
     if print_data:
         print("Previous:", previous_waypoint)
         print("Current:", current_waypoint)
@@ -308,6 +332,13 @@ def get_circle_direction(previous_waypoint, current_waypoint, centre_point, erro
     return False
 
 def mirror_across_line(line_point1, line_point2, point):
+    """
+    Returns the mirror of a given point across a line defined by two given points.
+    :param line_point1: The first point [x, y] of a line.
+    :param line_point2: The second point [x, y] of a line.
+    :param point: The point [x, y] that you want to find the mirror of.
+    :return: Returns the [mirrored_x, mirrored_y] of the given point.
+    """
     xm = point[0]
     ym = point[1]
     xo = line_point1[0]
@@ -332,12 +363,13 @@ def mirror_across_line(line_point1, line_point2, point):
 
 def find_dual_perpendicular_angle(radius, origin, point, n=0):
     """
-
-    :param radius:
-    :param origin:
-    :param point:
-    :param n:
-    :return:
+    This function finds the angle, in radians, where a point exists away a circle centre where the line it makes from
+    circle centre to that point is perpendicular to the point to the next waypoint.
+    :param radius: The radius of the circle.
+    :param origin: The circle centre.
+    :param point: The next waypoint to go to.
+    :param n: A constant that increases the angle by 2pi so it's useless really.
+    :return: The angle the point lies from the centre of the circle.
     """
     r = radius
     origin_x = origin[0]
@@ -352,10 +384,9 @@ def find_dual_perpendicular_angle(radius, origin, point, n=0):
     arcsin_denominator = math.sqrt(next_point_x ** 2 - 2 * next_point_x * origin_x + next_point_y ** 2 - 2 * next_point_y * origin_y + origin_x ** 2 + origin_y ** 2)
     arcsin_stuff = arcsin_numerator / arcsin_denominator
 
-    # Reference this desmos page: https://www.desmos.com/calculator/loniceqosa
-    # This equation comes from the solve function of my calendar. I solved for when M_NI was equal to M_IN and made
+    # Reference this desmos page: https://www.desmos.com/calculator/v2rkd8xbkx
+    # This equation comes from the solve function of my calculator. I solved for when M_NI was equal to M_IN and made
     # t (theta) the subject. All this numerator denominator stuff is just to make the code more readable.
-    # print("Next Point:", next_point_x, next_point_y, "\nOrigin:", origin_x, origin_y)
     numerator = - (2 * math.asin(arcsin_stuff) - 2 * math.atan2(arctan_numerator, arctan_denominator) + (sign(next_point_x - origin_x) - 2 * (2 * n + 1)) * math.pi)
     denominator = 2
     theta = numerator / denominator
@@ -363,6 +394,14 @@ def find_dual_perpendicular_angle(radius, origin, point, n=0):
     return theta
 
 def get_closest_centre_point(previous_waypoint, current_waypoint, next_waypoint, r):
+    """
+    Finds the centre point that is closest to the next waypoint.
+    :param previous_waypoint: [lat, lon], of the previous waypoint.
+    :param current_waypoint: [lat, lon], of the current waypoint.
+    :param next_waypoint: [lat, lon], of the next waypoint.
+    :param r: The minimum turning radius.
+    :return: The [lat, lon] point of the circle centre that is closest to the next waypoint.
+    """
     # Find the centre-point of the circle the path will trace.
     # Get perpendicular gradient of current waypoint to previous waypoint.
     inverse_gradient_numerator = current_waypoint[0] - previous_waypoint[0]
@@ -384,35 +423,17 @@ def get_closest_centre_point(previous_waypoint, current_waypoint, next_waypoint,
     else:
         return second_point
 
-def validate_perpendicularity(waypoints, initial_waypoint_count):
-    check_amount = initial_waypoint_count - 2
-    for index in range(check_amount):
-        prev1 = waypoints[index * 3]
-        curr1 = waypoints[index * 3 + 1]
-        next1 = waypoints[index * 3 + 2]
-        prev2 = waypoints[index * 3 + 2]
-        curr2 = waypoints[index * 3 + 3]
-        next2 = waypoints[index * 3 + 4]
-
-        previous_current_length = math.hypot(curr1[0] - prev1[0], curr1[1] - prev1[1])
-        current_next_length = math.hypot(next1[0] - curr1[0], next1[1] - curr1[1])
-        previous_next_length = math.hypot(next1[0] - prev1[0], next1[1] - prev1[1])
-        if (abs(previous_next_length ** 2) - abs(current_next_length ** 2 + previous_current_length ** 2)) > 0.0001:
-            print("Validation Check Index:", index, "| Intersection: 1 | FAILED!", "\n\t", previous_next_length ** 2, current_next_length ** 2 + previous_current_length ** 2)
-            print("\tWaypoints:", waypoints, initial_waypoint_count)
-            return False
-        print("Validation Check Index:", index, "| Intersection: 1 | OK!")
-        previous_current_length = math.hypot(curr2[0] - prev2[0], curr2[1] - prev2[1])
-        current_next_length = math.hypot(next2[0] - curr2[0], next2[1] - curr2[1])
-        previous_next_length = math.hypot(next2[0] - prev2[0], next2[1] - prev2[1])
-        if (abs(previous_next_length ** 2) - abs(current_next_length ** 2 + previous_current_length ** 2)) > 0.0001:
-            print("Validation Check Index:", index, "| Intersection: 2 | FAILED!", "\n\t", previous_next_length ** 2, current_next_length ** 2 + previous_current_length ** 2)
-            print("\tWaypoints:", waypoints, initial_waypoint_count)
-            return False
-        print("Validation Check:", index, "| Intersection: 2 | OK!")
-    return True
-
 def calculate_curve_exit(previous_waypoint, current_waypoint, next_waypoint, radius, print_data=False):
+    """
+    Calculates the point at which the plane exits the curve towards the next waypoint.
+    :param previous_waypoint: The [lat, lon] coordinate of the previous waypoint.
+    :param current_waypoint: The [lat, lon] coordinate of the current waypoint.
+    :param next_waypoint: The [lat, lon] coordinate of the next waypoint.
+    :param radius: The minimum turning radius of the plane.
+    :param print_data: A flag that will return information about all sorts of things. This is a debugging resource.
+    :return: A [lat, lon] point where the plane exits the curve and the centre point of the circle it traces. Returns
+    as <[lat, lon], [lat, lon]>
+    """
     # Define r as the minimum turn radius to make lines a bit neater.
     r = radius
     centre_point = get_closest_centre_point(previous_waypoint, current_waypoint, next_waypoint, r)
@@ -703,6 +724,16 @@ def calculate_curve_exit(previous_waypoint, current_waypoint, next_waypoint, rad
     return "NO CASE FOUND: MAJOR BUG", "help"
 
 def interpolate_all_curves(waypoints, centre_points, turn_radius, resolution, print_data=False):
+    """
+    Takes in a list of waypoints and a list of centre points for curves and returns a list of waypoints that
+    also interpolate the curves to a specified resolution.
+    :param waypoints: A list of waypoints that define waypoint to waypoint with curve exits.
+    :param centre_points: A list of centre points of the circles the plane with trace.
+    :param turn_radius: The minimum turn radius of the plane.
+    :param resolution: The resolution in waypoints per metre.
+    :param print_data: A flag that will return information about all sorts of things. This is a debugging resource.
+    :return: A list of waypoints that also contain the interpolated curve waypoints.
+    """
     r = turn_radius
     # Get index of curve points
     curve_indices = []
@@ -750,6 +781,11 @@ def interpolate_all_curves(waypoints, centre_points, turn_radius, resolution, pr
     return output
 
 def plot_waypoints(waypoints_to_plot, centre_points=[]):
+    """
+    A matplotlib function to plot the waypoints and curve centre points if given.
+    :param waypoints_to_plot: A list of waypoints to plot.
+    :param centre_points: An optional list of centre points to plot as scatter.
+    """
     if waypoints_to_plot == None:
         return False
     lat_vals = []
@@ -774,14 +810,23 @@ def plot_waypoints(waypoints_to_plot, centre_points=[]):
 
 
 if "__main__" == __name__:
+    """
+    Below is an example to show how to use the Spline Generator class.
+    First define waypoints as a list of points.
+    """
     # waypoints = [[4.0, 5.0], [7.0, 6.0], [6.0, 9.0], [4.0, 7.0], [2.0, 6], [1, 3], [-3, 0], [-4, 5]]
     # waypoints = [[40, 40], [40, 70], [70, 70], [70, 40]]
     # waypoints = [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0], [8, 5], [9, 3], [6, -4]]
     # waypoints = [[-10, 0], [-7, 0], [-5, 0], [-3, 0], [1, 2], [5, 4], [3, 0], [5, 2], [7, 0], [9, 2], [11, 0]]
     waypoints = [[5, 10], [9, 19], [12, 14], [11, 5], [3, -4], [-4, 2]]
     # waypoints = [[5, 2], [10, 9], [13, 6]]
-    Spline_Generator = SplineGenerator(waypoints=waypoints, turn_radius=get_maximum_turn_radius(waypoints=waypoints), resolution=2, tolerance=0, boundary_points=[])
-    Spline_Generator.print_waypoints()
-    output, centres = Spline_Generator.generate_spline()
-    plot_waypoints(output, centres)
+    """Then create an instance of the class and pass in the arguments."""
+    spline = SplineGenerator(waypoints=waypoints, turn_radius=get_maximum_turn_radius(waypoints=waypoints),
+                             resolution=1, tolerance=0, boundary_points=[])
+    """You can print the waypoint to the console just for the user."""
+    spline.print_waypoints()
+    """Use the 'generate_spline' method to calculate the new interpolated waypoints and centre points."""
+    spline_waypoints, centre_points = spline.generate_spline()
+    """Do whatever you want with the output. For instance here we plot them."""
+    plot_waypoints(spline_waypoints, centre_points)
 
